@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const FORCE_ASK_USERNAME = true;
+    const FORCE_ASK_USERNAME = false;
 
     const users = {
         "Dia": "#ffa53b",
@@ -18,65 +18,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getUserData() {
-        if (FORCE_ASK_USERNAME) {
-            localStorage.removeItem('username');
-            localStorage.removeItem('userGroup');
+        let username = localStorage.getItem('username');
+        let userGroup = localStorage.getItem('userGroup');
 
-            let username = prompt("Hello! Enter your username:")?.trim();
+        if (!username) {
+            username = prompt("Hello! Enter your username:")?.trim();
             while (!username) {
                 username = prompt("Why didn't you enter a username? :( Please enter your username:")?.trim();
             }
+            localStorage.setItem('username', username);
+        }
 
-            let userGroup = prompt("Are you Dia or Maroun?");
+        if (!userGroup) {
+            userGroup = prompt("Are you Dia or Maroun?");
             while (userGroup !== "Dia" && userGroup !== "Maroun") {
                 userGroup = prompt("Nope! Only Dia or Maroun can access:");
             }
-
-            return { username, userGroup };
-        } else {
-            let username = localStorage.getItem('username');
-            let userGroup = localStorage.getItem('userGroup');
-
-            if (!username) {
-                username = prompt("Hello! Enter your username:")?.trim();
-                while (!username) {
-                    username = prompt("Why didn't you enter a username? :( Please enter your username:")?.trim();
-                }
-                localStorage.setItem('username', username);
-            }
-
-            if (!userGroup) {
-                userGroup = prompt("Are you Dia or Maroun?");
-                while (userGroup !== "Dia" && userGroup !== "Maroun") {
-                    userGroup = prompt("Nope! Only Dia or Maroun can access:");
-                }
-                localStorage.setItem('userGroup', userGroup);
-            }
-
-            return { username, userGroup };
+            localStorage.setItem('userGroup', userGroup);
         }
+
+        return { username, userGroup };
     }
 
     const userData = getUserData();
-
-    const savedMessages = JSON.parse(localStorage.getItem('messages')) || [];
     const messagesDiv = document.getElementById('messages');
-    savedMessages.forEach(msg => {
-        addMessage(msg.username, msg.userGroup, msg.text, false); // no notify on load
-    });
 
     document.getElementById('messageForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const message = document.getElementById('messageInput').value.trim();
         if (message) {
-            const msgObj = {
+            db.ref("messages").push({
                 username: userData.username,
                 userGroup: userData.userGroup,
                 text: message
-            };
-            savedMessages.push(msgObj);
-            localStorage.setItem('messages', JSON.stringify(savedMessages));
-            addMessage(userData.username, userData.userGroup, message, true);
+            });
             this.reset();
         }
     });
@@ -88,9 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = `<strong>${username}:</strong> ${text}`;
         messagesDiv.insertBefore(div, messagesDiv.firstChild);
 
-        // Notify only if the sender is not the current user and we're not just loading old messages
         if (checkNotify && username !== userData.username) {
             notifyBrowser("New love letter 💌", `${username} sent you a letter!`);
         }
     }
+
+    // Load messages in real-time
+    db.ref("messages").on("child_added", (snapshot) => {
+        const msg = snapshot.val();
+        addMessage(msg.username, msg.userGroup, msg.text, true);
+    });
 });
